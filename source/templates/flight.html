@@ -4,8 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Flight Schedule</title>
-    <style>
-        /* Tổng thể trang */
+    <style>       
         body {
             font-family: 'Arial', sans-serif;
             background-color: #f0f4f8;
@@ -85,7 +84,6 @@
         button:hover {
             opacity: 0.9;
         }
-
     </style>
 </head>
 <body>
@@ -107,11 +105,10 @@
                     <th>Purpose</th>
                     <th>Departure Airport</th>
                     <th>Arrival Airport</th>
-                    <th>Take-off Time</th>
-                    <th>Take-off Date</th>
-                    <th>Landing Time</th>
+                    <th>Take off time</th>
+                    <th>Take off Date</th> <th>Landing Time</th>
                     <th>Landing Date</th>
-                    <th>Action</th>
+                    <th>Activity</th>
                 </tr>
             </thead>
             <tbody></tbody>
@@ -119,110 +116,111 @@
     </div>
 
     <script>
-        let flightsData = [];
+    let scheduleData = [];
 
-        async function fetchFlights() {
-            try {
-                const response = await fetch('http://localhost:5000/flights');
-                if (!response.ok) throw new Error(`Error: ${response.statusText}`);
-                const data = await response.json();
-                flightsData = data.flights;
-                displayFlights(flightsData);
-            } catch (error) {
-                document.getElementById('status').className = 'error';
-                document.getElementById('status').innerText = `Failed to load flights: ${error.message}`;
+    function formatOptimizedTime(isoString) {
+        if (!isoString) return "";
+        const d = new Date(isoString);
+        if (isNaN(d.getTime())) { return "ERR TIME"; }
+        return d.toLocaleTimeString("vi-VN", {
+            timeZone: "Asia/Ho_Chi_Minh",
+            hour12: false,
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit',
+        });
+    }
+
+    function getValue(item, key) {
+        const value = item[key];
+        if (key.includes('date') || key.includes('Date')) {
+            return (value === null || value === undefined || String(value).trim() === '') ? '-' : String(value);
+        }
+        
+        if (value === 0) return '0';
+        return (value === null || value === undefined || value === '') ? '-' : value;
+    }
+
+    async function fetchSchedule() {
+        document.getElementById('status').style.display = 'block';
+        document.getElementById('status').innerText = 'Loading optimized VVNB schedule...';
+        document.getElementById('flights-table').style.display = 'none';
+
+        try {
+            const response = await fetch('/vvnb_schedule'); 
+            if (!response.ok) throw new Error(`Error: ${response.statusText}`);
+            const data = await response.json();
+            
+            scheduleData = data.schedule; 
+            displaySchedule(scheduleData);
+        } catch (error) {
+            document.getElementById('status').className = 'error';
+            document.getElementById('status').innerText = `Failed to load schedule: ${error.message}. Vui lòng chạy lại train_model.py.`;
+        }
+    }
+
+    function displaySchedule(schedule) {
+        const table = document.getElementById('flights-table');
+        const tbody = table.querySelector('tbody');
+        tbody.innerHTML = '';
+
+        if (schedule.length === 0) {
+            document.getElementById('status').innerText = 'No optimized VVNB schedule data available.';
+            return;
+        }
+
+        schedule.forEach(item => {
+            const row = document.createElement('tr');
+            
+            row.style.backgroundColor = item.type === 'Takeoff' ? '#e6f7ff' : '#fff0e6'; 
+
+            let depAirport = getValue(item, 'Departure_airport');
+            let arrAirport = getValue(item, 'Arrival_airport');
+            
+            if (depAirport === '-' && item.type === 'Landing') {
+                depAirport = item.Airport_Info.substring(1); 
+            } else if (arrAirport === '-' && item.type === 'Takeoff') {
+                 arrAirport = item.Airport_Info.substring(1); 
             }
-        }
 
-        function displayFlights(flights) {
-            const table = document.getElementById('flights-table');
-            const tbody = table.querySelector('tbody');
-            tbody.innerHTML = '';
-            flights.forEach(flight => {
-                const row = document.createElement('tr');
-
-                row.innerHTML = `
-                    <td>${flight.Aircraft}</td>
-                    <td>${flight.Aircraft_type}</td>
-                    <td>${flight.Flight}</td>
-                    <td>${flight.Aircraft_registration}</td>
-                    <td>${flight.Flight_route}</td>
-                    <td>${flight.Flight_type}</td>
-                    <td>${flight.Flight_purpose}</td>
-                    <td>${flight.Departure_airport}</td>
-                    <td>${flight.Arrival_airport}</td>
-                    <td>${flight.Take_off_time}</td>
-                    <td>${flight.Take_off_date}</td>
-                    <td>${flight.Landing_time}</td>
-                    <td>${flight.Landing_date}</td>
-                    <td>
-                        <button class="delete-btn" onclick="deleteFlight(${flight.id})">Delete</button>
-                    </td>
-                `;
-                tbody.appendChild(row);
-            });
-            document.getElementById('status').style.display = 'none';
-            table.style.display = 'table';
-        }
-
-        async function deleteFlight(flightId) {
-            try {
-                const response = await fetch('http://localhost:5000/delete_flight', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ flight_id: flightId })
-                });
-                if (!response.ok) throw new Error('Failed to delete flight');
-                alert('Flight deleted successfully!');
-                fetchFlights();
-            } catch (error) {
-                alert(`Error: ${error.message}`);
-            }
-        }
-
-        function exportToExcel() {
-            let csvContent = "data:text/csv;charset=utf-8,";
-
-            // Thêm tiêu đề
-            const headers = [
-                "Aircraft", "Aircraft Type", "Flight", "Registration",
-                "Route", "Type", "Purpose", "Departure Airport",
-                "Arrival Airport", "Take-off Time", "Take-off Date",
-                "Landing Time", "Landing Date"
-            ];
-            csvContent += headers.join(",") + "\n";
-
-            // Thêm dữ liệu từ bảng
-            flightsData.forEach(flight => {
-                const row = [
-                    flight.Aircraft, flight.Aircraft_type, flight.Flight, flight.Aircraft_registration,
-                    flight.Flight_route, flight.Flight_type, flight.Flight_purpose, flight.Departure_airport,
-                    flight.Arrival_airport, flight.Take_off_time, flight.Take_off_date,
-                    flight.Landing_time, flight.Landing_date
-                ];
-                csvContent += row.join(",") + "\n";
-            });
-
-            // Tạo tệp và tải về
-            const encodedUri = encodeURI(csvContent);
-            const link = document.createElement("a");
-            link.setAttribute("href", encodedUri);
-            link.setAttribute("download", "flights_schedule.csv");
-            document.body.appendChild(link); // Required for Firefox
-            link.click();
-        }
-
-        document.getElementById('search-input').addEventListener('input', () => {
-            const searchTerm = document.getElementById('search-input').value.toLowerCase();
-            const filteredFlights = flightsData.filter(flight =>
-                flight.Aircraft_registration.toLowerCase().includes(searchTerm)
-            );
-            displayFlights(filteredFlights);
+            row.innerHTML = `
+                <td>${getValue(item, 'Aircraft')}</td>
+                <td>${getValue(item, 'Aircraft_type')}</td>
+                <td>${getValue(item, 'Flight')}</td>
+                <td>${getValue(item, 'Aircraft_registration')}</td>
+                <td>${getValue(item, 'Flight_route')}</td> 
+                <td>${getValue(item, 'Flight_type')}</td>
+                <td>${getValue(item, 'Flight_purpose')}</td>
+                
+                <td>${depAirport}</td>
+                <td>${arrAirport}</td>
+                
+                <td style="font-weight: bold; color: ${item.type === 'Takeoff' ? '#007bff' : '#ff9900'};">${formatOptimizedTime(item.Take_off_time_OPT)}</td>
+                
+                <td>${getValue(item, 'Take_off_date_OPT')}</td>
+                
+                <td>${formatOptimizedTime(item.Landing_time_PRED)}</td>
+                
+                <td>${getValue(item, 'Landing_date_PRED')}</td>
+                
+                <td style="font-weight: bold;">${item.type}</td>
+            `;
+            tbody.appendChild(row);
         });
 
-        document.getElementById('export-btn').addEventListener('click', exportToExcel);
+        document.getElementById('status').style.display = 'none';
+        table.style.display = 'table';
+    }
 
-        document.addEventListener('DOMContentLoaded', fetchFlights);
-    </script>
+    document.getElementById('search-input').addEventListener('input', () => {
+        const searchTerm = document.getElementById('search-input').value.toLowerCase();
+        const filteredFlights = scheduleData.filter(item =>
+            item.Aircraft_registration && item.Aircraft_registration.toLowerCase().includes(searchTerm)
+        );
+        displaySchedule(filteredFlights); 
+    });
+    
+    document.addEventListener('DOMContentLoaded', fetchSchedule);
+</script>
 </body>
 </html>
