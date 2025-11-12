@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Flight Schedule</title>
+    <style>
+        /* Tổng thể trang */
+        body {
+            font-family: 'Arial', sans-serif;
+            background-color: #f0f4f8;
+            margin: 0;
+            padding: 0;
+        }
+
+        .container {
+            max-width: 1800px;
+            margin: 20px auto;
+            padding: 20px;
+            background-color: #fff;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+
+        h1 {
+            text-align: center;
+            margin-bottom: 20px;
+            color: #333;
+            font-size: 2rem;
+        }
+
+        #search-input {
+            padding: 8px;
+            font-size: 1rem;
+            margin-bottom: 20px;
+            width: 100%;
+            max-width: 400px;
+            margin-left: auto;
+            margin-right: auto;
+            display: block;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+
+        table th, table td {
+            padding: 12px;
+            text-align: center;
+            border: 1px solid #ddd;
+            font-size: 1rem;
+        }
+
+        table th {
+            background-color: #007bff;
+            color: white;
+            font-weight: bold;
+        }
+
+        table tr:nth-child(even) {
+            background-color: #f2f2f2;
+        }
+
+        table tr:hover {
+            background-color: #f1f1f1;
+            cursor: pointer;
+        }
+
+        button {
+            padding: 8px 16px;
+            font-size: 1rem;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+
+        button.delete-btn {
+            background-color: #dc3545;
+            color: white;
+        }
+
+        button:hover {
+            opacity: 0.9;
+        }
+
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Flight Schedule</h1>
+        <input type="text" id="search-input" placeholder="Search by Aircraft Registration" />
+        <button id="export-btn" style="margin: 10px auto; display: block; padding: 10px 20px; font-size: 1rem;">Export to Excel</button>
+        <div id="status" class="loading">Loading flights...</div>
+        
+        <table id="flights-table" style="display: none;">
+            <thead>
+                <tr>
+                    <th>Aircraft</th>
+                    <th>Aircraft Type</th>
+                    <th>Flight</th>
+                    <th>Registration</th>
+                    <th>Route</th>
+                    <th>Type</th>
+                    <th>Purpose</th>
+                    <th>Departure Airport</th>
+                    <th>Arrival Airport</th>
+                    <th>Take-off Time</th>
+                    <th>Take-off Date</th>
+                    <th>Landing Time</th>
+                    <th>Landing Date</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody></tbody>
+        </table>
+    </div>
+
+    <script>
+        let flightsData = [];
+
+        async function fetchFlights() {
+            try {
+                const response = await fetch('http://localhost:5000/flights');
+                if (!response.ok) throw new Error(`Error: ${response.statusText}`);
+                const data = await response.json();
+                flightsData = data.flights;
+                displayFlights(flightsData);
+            } catch (error) {
+                document.getElementById('status').className = 'error';
+                document.getElementById('status').innerText = `Failed to load flights: ${error.message}`;
+            }
+        }
+
+        function displayFlights(flights) {
+            const table = document.getElementById('flights-table');
+            const tbody = table.querySelector('tbody');
+            tbody.innerHTML = '';
+            flights.forEach(flight => {
+                const row = document.createElement('tr');
+
+                row.innerHTML = `
+                    <td>${flight.Aircraft}</td>
+                    <td>${flight.Aircraft_type}</td>
+                    <td>${flight.Flight}</td>
+                    <td>${flight.Aircraft_registration}</td>
+                    <td>${flight.Flight_route}</td>
+                    <td>${flight.Flight_type}</td>
+                    <td>${flight.Flight_purpose}</td>
+                    <td>${flight.Departure_airport}</td>
+                    <td>${flight.Arrival_airport}</td>
+                    <td>${flight.Take_off_time}</td>
+                    <td>${flight.Take_off_date}</td>
+                    <td>${flight.Landing_time}</td>
+                    <td>${flight.Landing_date}</td>
+                    <td>
+                        <button class="delete-btn" onclick="deleteFlight(${flight.id})">Delete</button>
+                    </td>
+                `;
+                tbody.appendChild(row);
+            });
+            document.getElementById('status').style.display = 'none';
+            table.style.display = 'table';
+        }
+
+        async function deleteFlight(flightId) {
+            try {
+                const response = await fetch('http://localhost:5000/delete_flight', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ flight_id: flightId })
+                });
+                if (!response.ok) throw new Error('Failed to delete flight');
+                alert('Flight deleted successfully!');
+                fetchFlights();
+            } catch (error) {
+                alert(`Error: ${error.message}`);
+            }
+        }
+
+        function exportToExcel() {
+            let csvContent = "data:text/csv;charset=utf-8,";
+
+            // Thêm tiêu đề
+            const headers = [
+                "Aircraft", "Aircraft Type", "Flight", "Registration",
+                "Route", "Type", "Purpose", "Departure Airport",
+                "Arrival Airport", "Take-off Time", "Take-off Date",
+                "Landing Time", "Landing Date"
+            ];
+            csvContent += headers.join(",") + "\n";
+
+            // Thêm dữ liệu từ bảng
+            flightsData.forEach(flight => {
+                const row = [
+                    flight.Aircraft, flight.Aircraft_type, flight.Flight, flight.Aircraft_registration,
+                    flight.Flight_route, flight.Flight_type, flight.Flight_purpose, flight.Departure_airport,
+                    flight.Arrival_airport, flight.Take_off_time, flight.Take_off_date,
+                    flight.Landing_time, flight.Landing_date
+                ];
+                csvContent += row.join(",") + "\n";
+            });
+
+            // Tạo tệp và tải về
+            const encodedUri = encodeURI(csvContent);
+            const link = document.createElement("a");
+            link.setAttribute("href", encodedUri);
+            link.setAttribute("download", "flights_schedule.csv");
+            document.body.appendChild(link); // Required for Firefox
+            link.click();
+        }
+
+        document.getElementById('search-input').addEventListener('input', () => {
+            const searchTerm = document.getElementById('search-input').value.toLowerCase();
+            const filteredFlights = flightsData.filter(flight =>
+                flight.Aircraft_registration.toLowerCase().includes(searchTerm)
+            );
+            displayFlights(filteredFlights);
+        });
+
+        document.getElementById('export-btn').addEventListener('click', exportToExcel);
+
+        document.addEventListener('DOMContentLoaded', fetchFlights);
+    </script>
+</body>
+</html>
