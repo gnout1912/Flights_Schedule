@@ -1,4 +1,3 @@
-# source/app.py
 from flask import Flask, request, jsonify, render_template
 from flask_cors import CORS
 import csv, io, math
@@ -51,9 +50,6 @@ def haversine_km(a, b):
 from datetime import timezone, timedelta
 
 def _normalize_time(t: str) -> str:
-    """
-    Chuẩn hóa 'H:MM:SS' -> 'HH:MM:SS' (vd: '0:02:41' -> '00:02:41')
-    """
     t = str(t).strip()
     if not t:
         return t
@@ -64,10 +60,6 @@ def _normalize_time(t: str) -> str:
     return t
 
 def parse_dt(date_str, time_str):
-    """
-    Gộp ngày + giờ từ CSV -> datetime (giờ VN), trả về tz-naive để ghi MySQL.
-    Sử dụng định dạng MM/DD/YYYY.
-    """
     date_s = str(date_str).strip()
     time_s = _normalize_time(time_str)
 
@@ -91,9 +83,6 @@ def is_domestic(dep, arr):
     return str(dep).startswith("VV") and str(arr).startswith("VV")
 
 def parse_level(x):
-    """
-    Xử lý giá trị Flight_level, tính trung bình nếu có dấu chia (/).
-    """
     try:
         if isinstance(x, str) and "/" in x:
             vals = [float(v.strip()) for v in x.split("/") if v.strip()]
@@ -225,11 +214,6 @@ def upload_file():
 
 @app.route('/vvnb_schedule', methods=['GET'])
 def get_vvnb_schedule():
-    """
-    Đọc file vvnb_schedule.csv đã được tạo ra từ train_model.py,
-    chứa lịch trình cất/hạ cánh đã được tối ưu (luật 2p/0p) tại VVNB, 
-    và trả về dưới dạng JSON, chuyển đổi NaN thành null.
-    """
     try:
         schedule_df = pd.read_csv("../source/vvnb_schedule.csv")
         
