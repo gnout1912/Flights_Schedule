@@ -9,10 +9,6 @@ from xgboost import XGBRegressor
 import matplotlib.pyplot as plt
 
 def parse_level(x):
-    """
-    Xử lý giá trị Flight_level, tính trung bình nếu có dấu chia (/),
-    nếu lỗi thì trả về 0.0.
-    """
     try:
         if isinstance(x, str) and "/" in x:
             vals = [float(v.strip()) for v in x.split("/") if v.strip()]
@@ -84,7 +80,6 @@ df["takeoff_dayofweek"] = df["takeoff_dt"].dt.dayofweek
 df_ohe = pd.get_dummies(df[["Departure_airport", "Arrival_airport"]], prefix=["dep", "arr"])
 df = pd.concat([df, df_ohe], axis=1)
 
-# Chọn cột features
 TIME_FEATURES = ['takeoff_hour', 'takeoff_minute', 'takeoff_dayofweek']
 OHE_FEATURES = [col for col in df.columns if col.startswith(('dep_', 'arr_'))]
 NUM_FEATURES = TIME_FEATURES + OHE_FEATURES + ['Flight_level']
@@ -129,36 +124,28 @@ print("✅ Đã cập nhật giờ hạ cánh dự kiến chính xác hơn.")
 
 print("6️⃣ Tối ưu hóa lịch trình tại VVNB (Áp dụng luật 2p/0p) cho tất cả các chuyến bay liên quan...")
 
-# CÁC CỘT THUỘC TÍNH GỐC CẦN GIỮ LẠI
 ORIGINAL_ATTRIBUTES = ['Aircraft', 'Aircraft_type', 'Flight', 'Aircraft_registration', 
                        'Flight_route', 'Flight_type', 'Flight_purpose', 'Flight_level']
 TIME_AND_ROUTE = ['takeoff_dt', 'landing_dt', 'Departure_airport', 'Arrival_airport', 'duration_hr']
 ALL_REQUIRED_COLS = TIME_AND_ROUTE + ORIGINAL_ATTRIBUTES
 
-# SỬA LỖI CÚ PHÁP LỌC DỮ LIỆU
 df_vvnb_events = df[(df['Departure_airport'] == "VVNB") | (df['Arrival_airport'] == "VVNB")][ALL_REQUIRED_COLS].copy()
 
-# Tách dữ liệu thành 2 phần để xử lý
 vvnb_dep = df_vvnb_events[df_vvnb_events["Departure_airport"] == "VVNB"].copy()
 vvnb_arr = df_vvnb_events[df_vvnb_events["Arrival_airport"] == "VVNB"].copy()
 
-# CHỌN TẤT CẢ CÁC CỘT CẦN THIẾT KHI TẠO SCHEDULE
 DEP_SCHEDULE_COLS = ['takeoff_dt', 'Arrival_airport', 'duration_hr'] + ORIGINAL_ATTRIBUTES + ['Departure_airport']
 ARR_SCHEDULE_COLS = ['landing_dt', 'Departure_airport', 'duration_hr'] + ORIGINAL_ATTRIBUTES + ['Arrival_airport']
 
-# Tạo DataFrame cho CẤT CÁNH
 schedule_dep = vvnb_dep[DEP_SCHEDULE_COLS].rename(columns={"takeoff_dt": "time", "Arrival_airport": "Target"})
 schedule_dep = schedule_dep.assign(type="Takeoff")
 
-# Tạo DataFrame cho HẠ CÁNH
 schedule_arr = vvnb_arr[ARR_SCHEDULE_COLS].rename(columns={"landing_dt": "time", "Departure_airport": "Target"})
 schedule_arr = schedule_arr.assign(type="Landing")
 
 
-# Ghép và sắp xếp lịch trình
 schedule = pd.concat([schedule_dep, schedule_arr], ignore_index=True).sort_values("time").reset_index(drop=True)
 
-# Áp dụng Luật Tối ưu 2p/0p
 MIN_GAP = pd.Timedelta(minutes=2)
 
 for i in range(1, len(schedule)):
@@ -176,8 +163,6 @@ schedule["Airport_Info"] = schedule.apply(
     axis=1
 )
 
-# THÊM CÁC CỘT THỜI GIAN MỚI ĐỂ ĐỒNG BỘ VỚI WEB VÀ HIỂN THỊ 2 ĐẦU MÚT
-# Dùng thời gian tối ưu (time) và duration_hr để tính toán lại 2 đầu mút
 schedule['Take_off_time_OPT'] = schedule.apply(
     lambda row: row['time'] if row['type'] == 'Takeoff' else row['time'] - pd.to_timedelta(row['duration_hr'], unit='h'),
     axis=1
@@ -188,12 +173,10 @@ schedule['Landing_time_PRED'] = schedule.apply(
     axis=1
 )
 
-# THÊM CỘT TAKE-OFF DATE
 schedule['Take_off_date_OPT'] = schedule['Take_off_time_OPT'].dt.date
 schedule['Landing_date_PRED'] = schedule['Landing_time_PRED'].dt.date
 
 
-# CÁC CỘT CUỐI CÙNG ĐỂ XUẤT RA FILE CSV (Đầy đủ thuộc tính)
 FINAL_SCHEDULE_COLS = [
     "Take_off_time_OPT", "Take_off_date_OPT", "Landing_time_PRED", "Landing_date_PRED", 
     "type", "Airport_Info", "duration_hr", 
@@ -216,7 +199,6 @@ def get_label(schedule, i, current_type):
     return current_type if current_type != prev_type else ""
 
 for i,row in schedule.iterrows():
-    # Sử dụng Take_off_time_OPT cho tọa độ X (đại diện cho sự kiện)
     plt.scatter(row["Take_off_time_OPT"], i, color=colors[row["type"]], 
                 label=get_label(schedule, i, row['type']), s=50) 
 
